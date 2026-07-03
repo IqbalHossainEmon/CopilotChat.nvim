@@ -530,7 +530,7 @@ end
 ---@field get_headers nil|fun():table<string, string>,number?
 ---@field get_info nil|fun(headers:table):string[]
 ---@field get_models nil|fun(headers:table):table<CopilotChat.client.Model>
----@field resolve_model nil|fun(headers:table, model: string):string
+---@field resolve_model nil|fun(headers:table, model: string):string, table<string, string>?
 ---@field prepare_input nil|fun(inputs:CopilotChat.client.Message[], opts:CopilotChat.config.providers.Options):table,table?
 ---@field prepare_output nil|fun(output:table, opts:CopilotChat.config.providers.Options):CopilotChat.config.providers.Output
 ---@field get_url nil|fun(opts:CopilotChat.config.providers.Options):string
@@ -626,19 +626,37 @@ M.copilot = {
     -- Build request headers without our internal routing header.
     local request_headers = vim.tbl_extend('force', headers, { ['x-copilot-base-url'] = nil })
 
+    local auth = headers.Authorization or headers.authorization or ''
+    local sku = auth:match('sku=([^;]+)') or 'free'
+
     local response, err = curl.get(base_url .. '/models', {
       json_response = true,
       headers = request_headers,
     })
 
     if err then
+      print(debug.traceback('get_models error: ' .. vim.inspect(err)))
       error(err)
+    end
+
+    local function sku_matches_restricted_to(sku, restricted_to)
+      if not restricted_to or vim.tbl_isempty(restricted_to) then
+        return true
+      end
+
+      for _, tier in ipairs(restricted_to) do
+        if sku:find(tier, 1, true) then
+          return true
+        end
+      end
+
+      return false
     end
 
     local models = vim
       .iter(response.body.data)
       :filter(function(model)
-        return model.capabilities.type == 'chat' and model.model_picker_enabled
+        return model.capabilities.type == 'chat' and sku_matches_restricted_to(sku, model.restricted_to)
       end)
       :map(function(model)
         local supported_endpoints = model.supported_endpoints or {}
@@ -714,7 +732,7 @@ M.copilot = {
       error(err)
     end
 
-    return response.body.selected_model
+    return response.body.selected_model, { ['Copilot-Session-Token'] = response.body.session_token }
   end,
 
   prepare_input = function(inputs, opts)

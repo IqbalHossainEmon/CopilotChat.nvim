@@ -557,6 +557,7 @@ function M.ask(prompt, config)
       end
 
       local response = ask_response.message
+      local effective_model = response.model or selected_model
       local token_count = ask_response.token_count
       local token_max_count = ask_response.token_max_count
 
@@ -632,7 +633,7 @@ function M.ask(prompt, config)
                     resources = resolved_resources,
                     tools = selected_tools,
                     system_prompt = system_prompt,
-                    model = selected_model,
+                    model = effective_model,
                     temperature = config.temperature,
                     on_progress = vim.schedule_wrap(function(message)
                       if not config.headless then
@@ -643,6 +644,7 @@ function M.ask(prompt, config)
 
                   if continue_response then
                     local continue_message = continue_response.message
+                    effective_model = continue_message.model or effective_model
                     continue_message.content = vim.trim(continue_message.content)
                     if utils.empty(continue_message.content) then
                       continue_message.content = ''

@@ -319,9 +319,11 @@ function Client:ask(opts)
     error('Provider not found: ' .. provider_name)
   end
 
+  local resolved_headers = nil
   if provider.resolve_model then
     local headers = self:authenticate(provider_name)
-    local resolved_model = provider.resolve_model(headers, opts.model)
+    local resolved_model, extra_headers = provider.resolve_model(headers, opts.model)
+    resolved_headers = extra_headers
     opts.model = resolved_model
     model_config = models[opts.model]
     if not model_config then
@@ -537,6 +539,10 @@ function Client:ask(opts)
   end
 
   local headers = self:authenticate(provider_name)
+
+  if resolved_headers then
+    headers = vim.tbl_extend('force', headers, resolved_headers)
+  end
 
   local request, extra_headers =
     provider.prepare_input(generate_ask_request(opts.system_prompt, history, generated_messages), options)
