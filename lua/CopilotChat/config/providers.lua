@@ -635,7 +635,6 @@ M.copilot = {
     })
 
     if err then
-      print(debug.traceback('get_models error: ' .. vim.inspect(err)))
       error(err)
     end
 
